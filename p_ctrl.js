@@ -1,0 +1,273 @@
+/**
+ * Payment Controller
+ * 
+ * Handles payment processing through Selcom API
+ * - Initiate payment (USSD push, checkout)
+ * - Confirm payment
+ * - Handle webhooks
+ * - Manage purchases
+ */
+
+const { selcomClient, SELCOM_CONFIG } = require('../config/selcom');
+const {
+  createPurchase,
+  updatePurchaseStatus,
+  getPurchaseById,
+  getUserPurchases,
+  hasUserPurchasedMovie,
+  createWalletTransaction,
+  updateWalletTransactionStatus,
+  updateUserBalance,
+  updateUserPhoneNumber
+} = require('../models/paymentModel');
+const { getMovieById } = require('../models/movieModel');
+const { getUserById } = require('../models/userModel');
+
+/**
+ * Initiate USSD payment (Selcom USSD Push)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware
+ */
+const initiateUSSDPayment = async (req, res, next) => {
+  try {
+    const { movieId, phoneNumber } = req.body;
+    const userId = req.user.id;
+
+    // Validation
+    if (!movieId || !phoneNumber) {
+      return res.status(400).json({ 
+        message: 'Movie ID and phone number are required' 
+      });
+    }
+
+    // Verify movie exists
+    const movie = await getMovieById(movieId);
+    if (!movie) {
+      return res.status(404).json({ message: 'Movie not found' });
+    }
+
+    // Check if already purchased
+    const alreadyPurchased = await hasUserPurchasedMovie(userId, movieId);
+    if (alreadyPurchased) {
+      return res.status(400).json({ message: 'You already own this movie' });
+    }
+
+    // Create purchase record
+    const purchase = await createPurchase(userId, movieId, movie.price, 'selcom');
+
+    // Create wallet transaction
+    await createWalletTransaction(
+      userId,
+      movie.price,
+      'purchase',
+      `purchase_${purchase.insertId}`,
+      `Purchase of ${movie.title}`
+    );
+
+    // Prepare Selcom USSD payload
+    const selcomPayload = {
+      amount: Math.round(movie.price),
+      phone_number: phoneNumber,
+      reference_id: `purchase_${purchase.insertId}`,
+      merchant_code: SELCOM_CONFIG.merchantCode,
+      email: req.user.email,
+      first_name: req.user.name.split(' ')[0],
+      last_name: req.user.name.split(' ')[1] || '',
+      description: `TanzaFlix - ${movie.title}`,
+      webhook_url: `${process.env.WEBHOOK_URL}/api/payment/webhook`,
+      return_url: `${process.env.FRONTEND_URL}/movies/${movieId}`,
+      cancel_url: `${process.env.FRONTEND_URL}/movies`
+    };
+
+    // Call Selcom API
+    const response = await selcomClient.post('/api/v1/ussd-push', selcomPayload);
+
+    if (response.data.status === 'success') {
+      // Update purchase with transaction ID
+      await updatePurchaseStatus(
+        purchase.insertId,
+        'pending',
+        response.data.transaction_id
+      );
+
+      res.json({
+        message: 'Payment initiated successfully',
+        purchaseId: purchase.insertId,
+        transactionId: response.data.transaction_id,
+        amount: movie.price,
+        movie: movie.title
+      });
+    } else {
+      throw new Error(response.data.message || 'Failed to initiate payment');
+    }
+
+  } catch (error) {
+    console.error('USSD Payment Error:', error);
+    next(error);
+  }
+};
+
+/**
+ * Process Selcom webhook callback
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware
+ */
+const processWebhook = async (req, res, next) => {
+  try {
+    const { status, transaction_id, reference_id } = req.body;
+
+    // Verify webhook signature (if provided by Selcom)
+    // TODO: Implement signature verification
+
+    if (status === 'completed') {
+      // Extract purchase ID from reference
+      const purchaseId = parseInt(reference_id.split('_')[1]);
+
+      // Update purchase status
+      await updatePurchaseStatus(purchaseId, 'completed', transaction_id);
+
+      // Get purchase details
+      const purchase = await getPurchaseById(purchaseId);
+
+      // Update user balance (negative means payment received)
+      await updateUserBalance(purchase.user_id, -purchase.amount);
+
+      // Update wallet transaction
+      await updateWalletTransactionStatus(
+        purchase.id,
+        'completed'
+      );
+
+      res.json({ message: 'Webhook processed successfully' });
+    } else if (status === 'failed') {
+      const purchaseId = parseInt(reference_id.split('_')[1]);
+      await updatePurchaseStatus(purchaseId, 'failed', transaction_id);
+
+      res.json({ message: 'Payment failed' });
+    } else {
+      res.status(400).json({ message: 'Unknown payment status' });
+    }
+
+  } catch (error) {
+    console.error('Webhook Error:', error);
+    next(error);
+  }
+};
+
+/**
+ * Get purchase status
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware
+ */
+const getPurchaseStatus = async (req, res, next) => {
+  try {
+    const { purchaseId } = req.params;
+
+    const purchase = await getPurchaseById(purchaseId);
+    if (!purchase) {
+      return res.status(404).json({ message: 'Purchase not found' });
+    }
+
+    res.json(purchase);
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get user's purchases
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware
+ */
+const getUserMoviePurchases = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const purchases = await getUserPurchases(userId);
+
+    res.json({
+      total: purchases.length,
+      purchases: purchases
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Link phone number to account (for faster payments)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware
+ */
+const linkPhoneNumber = async (req, res, next) => {
+  try {
+    const { phoneNumber } = req.body;
+    const userId = req.user.id;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ message: 'Phone number is required' });
+    }
+
+    await updateUserPhoneNumber(userId, phoneNumber);
+
+    res.json({ 
+      message: 'Phone number linked successfully',
+      phoneNumber: phoneNumber
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Verify payment with Selcom
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware
+ */
+const verifyPayment = async (req, res, next) => {
+  try {
+    const { transactionId } = req.body;
+
+    if (!transactionId) {
+      return res.status(400).json({ message: 'Transaction ID is required' });
+    }
+
+    // Query Selcom API for transaction status
+    const response = await selcomClient.get(
+      `/api/v1/transaction/${transactionId}`,
+      {
+        headers: {
+          'X-Merchant-ID': SELCOM_CONFIG.merchantId,
+          'X-API-Key': SELCOM_CONFIG.apiKey
+        }
+      }
+    );
+
+    res.json({
+      status: response.data.status,
+      transactionId: response.data.transaction_id,
+      amount: response.data.amount
+    });
+
+  } catch (error) {
+    console.error('Verify Payment Error:', error);
+    next(error);
+  }
+};
+
+module.exports = {
+  initiateUSSDPayment,
+  processWebhook,
+  getPurchaseStatus,
+  getUserMoviePurchases,
+  linkPhoneNumber,
+  verifyPayment
+};

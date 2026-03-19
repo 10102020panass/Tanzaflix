@@ -1,0 +1,150 @@
+// scripts.js - Handles interactivity for TanzaFlix
+
+const API_BASE_URL = 'http://localhost:5000/api';
+
+document.addEventListener("DOMContentLoaded", () => {
+  const categoryButtons = document.querySelectorAll(".categories button");
+  const movieSection = document.getElementById("adminMovieList") || document.querySelector(".movie-section");
+
+  function renderMovies(category, titleText) {
+    movieSection.innerHTML = `<h3>Inapakia filamu za ${titleText || category}...</h3>`;
+    
+    // Fetch movies from backend
+    fetch(`${API_BASE_URL}/movies/category/${category}`)
+      .then(response => response.json())
+      .then(data => {
+        const movies = data.movies || [];
+        
+        const movieList = document.createElement("div");
+        movieList.className = "movie-list";
+        
+        if (movies.length === 0) {
+          movieSection.innerHTML = `<h3>${titleText || 'Filamu za ' + category}</h3><p style="padding: 20px;">Hakuna filamu zilizopatikana kwenye kundi hili.</p>`;
+          return;
+        }
+
+        movies.forEach(movie => {
+          const card = document.createElement("div");
+          // Generate an appealing background class or random color
+          const colors = ["purple", "violet", "blue", "red", "green"];
+          const color = colors[Math.floor(Math.random() * colors.length)];
+          card.className = `movie-card ${color}`;
+
+          const icon = document.createElement("div");
+          icon.className = "video-icon";
+          
+          let mediaElement = '';
+          if (movie.video_url && movie.video_url !== '') {
+             const videoUrl = movie.video_url.startsWith('http') ? movie.video_url : `http://localhost:5000${movie.video_url}`;
+             mediaElement = `
+              <video autoplay muted loop playsinline>
+                <source src="${videoUrl}" type="video/mp4">
+              </video>
+            `;
+          } else if (movie.image_url && movie.image_url !== '') {
+            const imageUrl = movie.image_url.startsWith('http') ? movie.image_url : `http://localhost:5000${movie.image_url}`;
+            mediaElement = `<img src="${imageUrl}" alt="${movie.title}" style="width:100%; height:100%; object-fit:cover;" />`;
+          } else {
+            mediaElement = `<div style="display:flex; justify-content:center; align-items:center; height:100%; background:#2a2a35; color: white;">ðŸŽ¬</div>`;
+          }
+          icon.innerHTML = mediaElement;
+
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = movie.quality || "HD";
+
+          const info = document.createElement("div");
+          info.className = "movie-info";
+          
+          // Map backend fields to frontend usage
+          const movieObj = {
+            id: movie.id,
+            title: movie.title,
+            year: movie.year || movie.release_year || '',
+            genre: movie.category || movie.genre || '',
+            price: movie.price || 600,
+            video: movie.video_url
+          };
+
+          info.innerHTML = `
+            <strong>${movie.title}</strong>
+            <p>${movie.year || ''} â€¢ ${movie.category || ''}</p>
+            <div style="display:flex;gap:10px;">
+              <a class="watch-btn" href="#" data-movie='${JSON.stringify(movieObj).replace(/'/g, "&apos;")}'>Nunua</a>
+              <button class="add-to-cart" title="Add to Cart" data-movie='${JSON.stringify(movieObj).replace(/'/g, "&apos;")}'>ðŸ›’</button>
+            </div>
+          `;
+
+          card.appendChild(icon);
+          card.appendChild(badge);
+          card.appendChild(info);
+          movieList.appendChild(card);
+        });
+
+        movieSection.innerHTML = `<h3>${titleText || 'Filamu za ' + category}</h3>`;
+        movieSection.appendChild(movieList);
+      })
+      .catch(error => {
+        console.error("Error fetching movies:", error);
+        movieSection.innerHTML = `<h3>${titleText || 'Filamu za ' + category}</h3><p style="padding: 20px; color: red;">Kumeshindikana kupata filamu. Tafadhali jaribu tena.</p>`;
+      });
+  }
+
+  categoryButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelector(".categories button.active")?.classList.remove("active");
+      btn.classList.add("active");
+      renderMovies(btn.dataset.category || btn.textContent.trim(), btn.textContent);
+    });
+  });
+
+  const firstActiveBtn = document.querySelector(".categories button.active") || categoryButtons[0];
+  if (firstActiveBtn) {
+    firstActiveBtn.classList.add("active");
+    const initCat = firstActiveBtn.dataset.category || firstActiveBtn.textContent.trim();
+    renderMovies(initCat, firstActiveBtn.textContent);
+  } else {
+    renderMovies("Kihindi", "Filamu za Kihindi (Zilizotafsiriwa)");
+  }
+});
+
+let cart = [];
+
+function openCartDrawer() {
+  document.getElementById("cartDrawer").classList.add("open");
+  renderCartItems();
+}
+
+function closeCartDrawer() {
+  document.getElementById("cartDrawer").classList.remove("open");
+}
+
+function renderCartItems() {
+  const cartItems = document.getElementById("cartItems");
+  const checkoutBtn = document.getElementById("checkoutBtn");
+  
+  if (cart.length === 0) {
+    cartItems.innerHTML = "<p>Hakuna filamu kwenye toroli.</p>";
+    if (checkoutBtn) checkoutBtn.innerText = "Nunua Zote";
+    return;
+  }
+  
+  cartItems.innerHTML = "";
+  let totalCost = 0;
+  
+  cart.forEach((movie, index) => {
+    const moviePrice = 600; // TZS 600 kwa kila filamu
+    totalCost += moviePrice;
+    
+    const item = document.createElement("div");
+    item.className = "cart-item";
+    item.innerHTML = `
+      <div style="margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap;">
+        <span class="cart-movie-title"><i class="fa fa-film" style="color:#e50914; margin-right: 6px; font-size: 0.9rem;"></i>${movie.title}</span>
+        <span class="cart-movie-year">${movie.year}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+        <small style="color: #aaa; font-size: 0.85rem;"><i class="fa fa-tags" style="color:#888; margin-right: 4px;"></i>${movie.genre}</small>
+        <span class="price-badge">Tsh ${moviePrice} /=</span>
+      </div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 10px; margin-bottom: 5px;">
