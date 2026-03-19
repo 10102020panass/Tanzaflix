@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Tanzaflix – Stream the best African cinema, from Tanzanian blockbusters to pan-African classics." />
+  <title>Tanzaflix – African Cinema Streaming</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Favicon: simple emoji approach for zero dependencies -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>" />
+</head>
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" id="navbar" role="navigation" aria-label="Main navigation">
+    <div class="navbar-logo" aria-label="Tanzaflix home">Tanza<span>flix</span></div>
+    <ul class="navbar-links" role="list">
+      <li><a href="#" class="active" aria-current="page">Home</a></li>
+      <li><a href="#">TV Shows</a></li>
+      <li><a href="#">Movies</a></li>
+      <li><a href="#">New &amp; Popular</a></li>
+      <li><a href="#">My List</a></li>
+    </ul>
+    <div class="navbar-right">
+      <form class="search-form" id="search-form" role="search" aria-label="Search movies">
+        <button type="button" class="icon-btn" id="search-toggle" aria-label="Toggle search">🔍</button>
+        <input
+          type="search"
+          id="search-input"
+          placeholder="Search titles, genres…"
+          aria-label="Search movies and shows"
+          autocomplete="off"
+        />
+      </form>
+      <button class="icon-btn" title="Notifications" aria-label="Notifications">🔔</button>
+      <button class="icon-btn" title="Profile" aria-label="Profile">👤</button>
+    </div>
+  </nav>
+
+  <!-- ===== HERO ===== -->
+  <section class="hero" id="hero" aria-label="Featured film">
+    <img class="hero-img" id="hero-img" src="" alt="" />
+    <div class="hero-gradient" aria-hidden="true"></div>
+    <div class="hero-content">
+      <div class="hero-badge">🎬 Featured Film</div>
+      <h1 class="hero-title" id="hero-title"></h1>
+      <div class="hero-meta">
+        <span class="score" id="hero-score"></span>
+        <span id="hero-year"></span>
+        <span class="rating" id="hero-rating"></span>
+        <span id="hero-duration"></span>
+      </div>
+      <p class="hero-desc" id="hero-desc"></p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" id="hero-play" aria-label="Play featured film">
+          ▶ Play
+        </button>
+        <button class="btn btn-secondary" id="hero-info" aria-label="More information">
+          ⓘ More Info
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ROWS ===== -->
+  <main class="rows-section" id="rows-section" aria-label="Movie catalogue"></main>
+
+  <!-- ===== SEARCH RESULTS ===== -->
+  <section class="search-results-section hidden" id="search-results" aria-label="Search results">
+    <h2 class="search-heading"></h2>
+    <div class="search-grid"></div>
+  </section>
+
+  <!-- ===== MODAL ===== -->
+  <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-label="Movie details">
+    <div class="modal" id="modal">
+      <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+      <img class="modal-banner" id="modal-banner" src="" alt="" loading="lazy" />
+      <div class="modal-banner-overlay" aria-hidden="true"></div>
+      <div class="modal-body">
+        <h2 class="modal-title" id="modal-title"></h2>
+        <div class="modal-actions">
+          <button class="btn btn-primary" id="modal-play">▶ Play</button>
+          <button class="btn btn-secondary" id="modal-watchlist">+ My List</button>
+        </div>
+        <div class="modal-meta">
+          <span class="modal-score" id="modal-score"></span>
+          <span id="modal-year"></span>
+          <span class="modal-rating" id="modal-rating"></span>
+          <span id="modal-duration"></span>
+        </div>
+        <p class="modal-desc" id="modal-desc"></p>
+        <div class="modal-genres" id="modal-genres"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ===== FOOTER ===== -->
+  <footer>
+    <ul class="footer-links" aria-label="Footer links">
+      <li><a href="#">FAQ</a></li>
+      <li><a href="#">Help Centre</a></li>
+      <li><a href="#">Account</a></li>
+      <li><a href="#">Media Centre</a></li>
+      <li><a href="#">Investor Relations</a></li>
+      <li><a href="#">Jobs</a></li>
+      <li><a href="#">Privacy</a></li>
+      <li><a href="#">Terms of Use</a></li>
+      <li><a href="#">Contact Us</a></li>
+    </ul>
+    <p>&copy; 2025 Tanzaflix. All rights reserved.</p>
+  </footer>
+
+  <script src="movies.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
